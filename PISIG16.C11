@@ -1,0 +1,286 @@
+    
+    #include <stdint.h>  
+    #include <string.h>  
+    #include <stdio.h> 
+    #include <assert.h>  
+
+
+//:PRINT_HEX_ARRAY:==========================================://
+#define I32  int32_t  /** GCC: <stdint.h> **/
+#define U16 uint16_t  /** GCC: <stdint.h> **/
+
+    void
+    PISIG16_PrintHextetArray( 
+        U16* het_arr  /** Hextet Array        **/
+    ,   I32      m_i  /** Maximum Valid Index **/
+    )
+    {
+        U16 u16_var;
+
+        for( int h_i = 0 ; h_i <= m_i ; h_i ++ ){
+
+            u16_var = het_arr[ h_i ];
+            printf("0x");
+            printf("%04x" , u16_var);
+            printf("\n,");
+
+        };;
+    }
+
+#undef  I32
+#undef  U16
+//:==========================================:PRINT_HEX_ARRAY://
+//:TEXT_TO_HEXTETS:==========================================://
+#define MHP ( 128 / 2  ) /** 128 chars,64 hextets **/ //: 01 ://
+#define I32      int32_t /** GCC: <stdint.h> **/      //: 02 ://
+#define U08      uint8_t /** GCC: <stdint.h> **/      //: 03 ://
+#define U16     uint16_t /** GCC: <stdint.h> **/      //: 04 ://
+
+    //: - - - - - - - - - - - - ---- - - - - - - - - - - - - ://
+
+    /** MHP == Maximum_Half_Pixels **/
+    U16 PISIG16_het_001[ MHP + 1 /**+1 for Null**/ ]={ 0 };
+    U16 PISIG16_het_002[ MHP + 1 /**+1 for Null**/ ]={ 0 };
+
+    U08 PISIG16_GetByte( char* txt_str , I32 b_i , I32 m_i ){
+
+        U08 u08_var = 0x00;
+        if( b_i <= m_i ){ u08_var = txt_str[ b_i ]; };
+       
+        return( u08_var );
+    } 
+
+    //: - - - - - - - - - - - - ---- - - - - - - - - - - - - ://
+
+    U16
+    PISIG16_PackHextet_001( 
+        char* txt_str    /** Text______String **/
+    ,   I32       h_i    /** Hextet_____Index **/
+    ,   I32       mbi    /** Max__Byte__Index **/
+    )
+    {
+        I32 com_dex = ( h_i * 2 );   /** Component Of HexTet **/
+        U16 u16_var = 0x0000     ;   /** Hextet Being Packed **/
+
+        #define TXT txt_str
+        #define DEX com_dex
+        u16_var=( 0x00 
+        |   ( PISIG16_GetByte( TXT,DEX+0,mbi ) <<  8 )  
+        |   ( PISIG16_GetByte( TXT,DEX+1,mbi ) <<  0 )  
+        );;
+        #undef  TXT
+        #undef  DEX
+
+        return( u16_var );
+    }
+
+    //: - - - - - - - - - - - - ---- - - - - - - - - - - - - ://
+
+    U16
+    PISIG16_PackHextet_002( 
+        char* txt_str    /** Text______String **/
+    ,   I32       h_i    /** Hextet_____Index **/
+    ,   I32       mbi    /** Max__Byte__Index **/
+    )
+    {
+        /** packing for little endian systems like windows. **/
+
+        I32 com_dex = ( h_i * 2 );   /** Component Of HexTet **/
+        U16 u16_var = 0x0000     ;   /** HexTet Being Packed **/
+
+        #define TXT txt_str
+        #define DEX com_dex
+        u16_var=( 0x00 
+        |   ( PISIG16_GetByte( TXT,DEX+1,mbi ) <<  8 )   
+        |   ( PISIG16_GetByte( TXT,DEX+0,mbi ) <<  0 )   
+        );;
+        #undef  TXT
+        #undef  DEX
+
+        return( u16_var );
+    }
+
+    //: - - - - - - - - - - - - ---- - - - - - - - - - - - - ://
+
+    void
+    PISIG16_TextToHextets( char* txt_str )
+    {
+        //:declare_variables:--------------------------------://
+
+            U16 u16_var; //:hextet variable ( uint16 == BA! )
+            I32     h_i; //:hextet index
+            I32     mhi; //:max hextet index
+            I32     mbi; //:max byte   index
+
+        //:--------------------------------:declare_variables://
+        //:era:erase_previous_buffer:------------------------://
+
+            for( int era = 0; era <( MHP ); era++ ){
+                PISIG16_het_001[ era ]=( (U16)0x0000 );
+                PISIG16_het_002[ era ]=( (U16)0x0000 );
+            };;
+
+        //:------------------------:era:erase_previous_buffer://
+        //:Figure_Out_Number_Of_Hextets:---------------------://
+
+            /** Two characters packed into each hextet  **/
+            /** Hence division by two.................. **/
+
+            int str_len = strlen( txt_str );
+            int num_het =( str_len / 2 );
+            if( num_het * 2 < str_len ){
+                /** Number of HEXTETS was rounded down.      **/
+                /** add 1 to round up. This is only workable **/
+                /** because PISIG16_GetByte will protect us  **/
+                /** from out of bounds access.               **/
+
+                num_het++; 
+            };;
+
+            /** Truncate so we don't overflow our buffer. **/
+            if( num_het > MHP ){ num_het = MHP; };
+
+        //:---------------------:Figure_Out_Number_Of_Hextets://        
+        //:Figure_Out_Maximum_Byte_Index:--------------------://
+
+            /** There are TWO characters packed into each **/
+            /** hextet. Hence MHP * 2 .................   **/
+
+            I32 mbi_hextets    =( (     MHP * 2 ) - 1 );
+            I32 mbi_characters =( ( str_len * 1 ) - 1 );
+
+            /** Maxmimum Byte Index is the lowest index **/
+            /** between array of bytes in our string vs **/
+            /** number of bytes in our hextets array.   **/
+
+            mbi =( 0 );
+            if(  mbi_characters >= mbi_hextets    ){
+                            mbi  = mbi_hextets    ;
+            };;
+            if(     mbi_hextets >= mbi_characters ){
+                            mbi  = mbi_characters ;
+            };;
+
+        //:--------------------:Figure_Out_Maximum_Byte_Index://
+        //:Pack_The_HexTets:---------------------------------://
+        #define GET_U16_001         PISIG16_PackHextet_001
+        #define GET_U16_002         PISIG16_PackHextet_002
+        #define PRINT_HEXTET_ARRAY  PISIG16_PrintHextetArray
+
+            mhi = ( num_het - 1 );
+            for( h_i    = 0 ; h_i <= mhi ; h_i ++ ){
+
+                u16_var = GET_U16_001( txt_str,h_i,mbi );
+                PISIG16_het_001[ h_i ] = u16_var ;
+
+                u16_var = GET_U16_002( txt_str,h_i,mbi );
+                PISIG16_het_002[ h_i ] = u16_var ;
+            };;
+
+            printf("\n");
+
+            printf("[BIG_ENDIAN]:\n");
+            PRINT_HEXTET_ARRAY( PISIG16_het_001 , ( h_i - 1 ) );
+            printf("0x0000");
+            printf("\n");
+            printf("\n");
+
+            printf("[LIT_ENDIAN]:\n");
+            PRINT_HEXTET_ARRAY( PISIG16_het_002 , ( h_i - 1 ) );
+            printf("0x0000");
+            printf("\n");
+            printf("\n");
+
+            for( h_i = h_i ; h_i < MHP ; h_i ++ ){
+                PISIG16_het_001[ h_i ] = 0x00;
+                PISIG16_het_002[ h_i ] = 0x00;
+            };;
+            PISIG16_het_001[ MHP + 1 ] = 0x00;
+            PISIG16_het_002[ MHP + 1 ] = 0x00;
+
+        #undef         GET_U16_001  
+        #undef         GET_U16_002  
+        #undef  PRINT_HEXTET_ARRAY
+        //:---------------------------------:Pack_The_HexTets://
+
+        printf( "[txt_str]:%s\n" , txt_str );
+    }
+
+    //: - - - - - - - - - - - - ---- - - - - - - - - - - - - ://
+
+#undef      MHP                                       //: 01 ://
+#undef      I32                                       //: 02 ://
+#undef      U08                                       //: 03 ://
+#undef      U16                                       //: 04 ://
+//:==========================================:TEXT_TO_HEXTETS://
+//:DO_THE_MAIN_STUFF:========================================://
+#define U16 uint16_t /** GCC: <stdint.h> **/
+
+    int main( int arg_num , char** arg_arr  ){
+
+        /** ***************************** **/
+        /** 2 arguments is exactly 1 user **/
+        /** supplied argument because 1st **/
+        /** argument is special.          **/
+        /** ***************************** **/
+
+        if( 2 == arg_num   ){
+            PISIG16_TextToHextets( arg_arr[ 1 ] );
+        }else{
+            printf("[User_Must_Supply]\n");
+            printf("[Exactly_1_Arg...]\n");
+        };;
+
+        printf("\n\n");
+
+        U16 big_endian[ 17 ]={ 
+0x636f
+,0x6465
+,0x645f
+,0x6279
+,0x5f6a
+,0x6f68
+,0x6e5f
+,0x6d61
+,0x726b
+,0x5f69
+,0x7361
+,0x6163
+,0x5f6d
+,0x6164
+,0x6973
+,0x6f6e
+,0x0000
+
+        };;
+        U16 lit_endian[ 17 ]={ 
+0x6f63
+,0x6564
+,0x5f64
+,0x7962
+,0x6a5f
+,0x686f
+,0x5f6e
+,0x616d
+,0x6b72
+,0x695f
+,0x6173
+,0x6361
+,0x6d5f
+,0x6461
+,0x7369
+,0x6e6f
+,0x0000
+
+        };;
+
+        printf( (void*)&(big_endian[0]) );
+        printf("\n\n");
+        printf( (void*)&(lit_endian[0]) );
+        printf("\n\n");
+        
+        printf("[exiting_function]");
+    } 
+
+#undef  U16
+//:========================================:DO_THE_MAIN_STUFF://
